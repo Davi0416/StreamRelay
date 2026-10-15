@@ -29,6 +29,8 @@ conexão direta.
 > [!IMPORTANT]
 > - Use o Discord baixado do site oficial, com a sua conta já conectada. A versão da Microsoft Store, o PTB e o
 >   Canary não são reconhecidos.
+> - Desconecte qualquer outra VPN antes de usar. O StreamRelay não funciona com outro cliente de VPN ativo ao mesmo
+>   tempo.
 > - O arquivo `.conf` contém a chave privada da sua VPN. Não use o `.conf` de outra pessoa e não envie o seu para
 >   ninguém.
 
@@ -307,20 +309,20 @@ Na primeira instalação do driver, pode haver uma breve desconexão da rede e u
 
   Os resultados visuais são relatos do operador, apoiados pelos contadores do motor (relays iniciados, migrados e
   0 falhas).
-- Com o backend NDIS atual: testes próprios de UDP (recepção conectada e não conectada, reuso de porta, parada normal
-  e encerramento forçado) passaram.
-- Desempenho medido em 12/10/2026, numa versão anterior do motor:
-  - do launcher até "armado": ≈ 3,5–4 s com o sistema já aquecido;
-  - memória privada total de motor, supervisor e watchdog: ≈ 5,9 MB.
+- Com o backend NDIS atual:
+  - testes próprios de UDP passaram: recepção conectada e não conectada, reuso de porta, parada normal e
+    encerramento forçado;
+  - a transmissão de tela funcionou com o Discord real;
+  - a instalação funcionou num computador que ainda não tinha o driver.
+- Desempenho:
+  - com a versão atual, o uso de RAM fica em torno de 20 MB, e o uso de CPU depende do processador;
+  - numa medição anterior (12/10/2026), o tempo do launcher até "armado" foi de ≈ 3,5–4 s, com o sistema já aquecido.
 
 **NÃO verificado:**
 
-- Transmissão real com o backend NDIS atual, registrada como teste.
-- Instalação em um computador que nunca teve o driver.
 - Repetição e variância; sessões de mais de 5 minutos; voltar a uma chamada; várias transmissões ou espectadores ao
   mesmo tempo; vazão do relay em picos de mídia.
-- Custo de CPU e latência da captura NDIS durante jogos.
-- Convivência com outros clientes de VPN ativos.
+- Latência adicionada pela captura NDIS durante jogos.
 - Parada e limpeza pelo caminho supervisor → watchdog → rollback, e a guarda de exposição disparando com rotas reais.
   A guarda foi testada só em simulação.
 - Partida no logon com o sistema frio.
@@ -330,6 +332,8 @@ Na primeira instalação do driver, pode haver uma breve desconexão da rede e u
 ## Limitações conhecidas
 
 - **Só IPv4.**
+- **Não funciona junto com outra VPN:** outro cliente de VPN ativo ao mesmo tempo impede o uso. Desconecte as outras
+  VPNs antes de clicar em *Iniciar*.
 - **Iniciar derruba uma chamada em andamento**, porque o Discord é fechado e reaberto.
 - **Uma conta por instalação:** as tarefas ficam ligadas à conta que instalou.
 - **Instalador sem assinatura de código:** o SmartScreen vai avisar.
