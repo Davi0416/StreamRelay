@@ -4,7 +4,7 @@
 passam por um túnel WireGuard; voz, texto, login, a mídia depois de estabilizada e o resto do computador seguem pela
 conexão direta.
 
-> **Estado: experimental (0.4.6).** Leia [Estado de verificação](#estado-de-verificação) antes de usar.
+> **Estado: experimental (0.4.7).** Leia [Estado de verificação](#estado-de-verificação) antes de usar.
 >
 > Gratuito e não comercial. Este repositório contém apenas esta descrição; o código-fonte não é público. O instalador está em
 > [Releases](../../releases).
@@ -80,6 +80,9 @@ Funciona com qualquer VPN que forneça um perfil WireGuard com um `[Interface]` 
 
 Quando o painel mostrar **Pronto**, use o Discord e compartilhe a tela normalmente. Fechar a janela do painel não para o
 StreamRelay; para desligar, clique em **Parar**.
+
+Se o painel avisar **O servidor da VPN não deixa o Discord passar**, gere na sua VPN um perfil de outro servidor,
+importe e clique em **Iniciar** de novo.
 
 ### 6. Atualizar
 
@@ -175,6 +178,13 @@ de criação do processo e caminho da imagem. Um PID reaproveitado por outro pro
 - O motor cria um adaptador **WireGuardNT** temporário com a lista de AllowedIPs do peer **vazia** e sem nenhuma rota.
   Métrica 5000 (IPv4 e IPv6), MTU 1420. Ele espera o handshake e depois apaga as chaves da memória.
 - Enquanto nada é exposto, o túnel existe mas nenhum destino é alcançável por ele.
+- Antes de ficar pronto, o motor confere se o gateway do Discord responde pelo túnel: o mesmo pedido de WebSocket que
+  o Discord faz, aceito só com a resposta de upgrade e com a conexão saindo de fato pelo túnel. Cada servidor tem até
+  3 tentativas.
+- Se o servidor do perfil não responder, o motor troca só o servidor do túnel, mantendo a chave do perfil, por uma
+  lista de servidores reserva que vem com o programa, em ordem, por até 30 s, e usa o primeiro que responder. A lista
+  traz servidores gratuitos da Proton VPN. Se nenhum responder, o túnel volta ao servidor do perfil, o Discord segue
+  pela conexão direta e o painel avisa.
 
 ### 3. Janela de bootstrap do gateway
 
@@ -314,6 +324,9 @@ Na primeira instalação do driver, pode haver uma breve desconexão da rede e u
     encerramento forçado;
   - a transmissão de tela funcionou com o Discord real;
   - a instalação funcionou num computador que ainda não tinha o driver.
+- Servidores reserva: com um servidor da Proton VPN que não deixava o Discord passar, o motor trocou para um servidor
+  reserva com a mesma chave e o Discord criou a sessão pelo túnel (uma execução, 15/10/2026). A mesma chave também foi
+  aceita em outros servidores gratuitos da Proton VPN.
 - Desempenho:
   - com a versão atual, o uso de RAM fica em torno de 20 MB, e o uso de CPU depende do processador;
   - numa medição anterior (12/10/2026), o tempo do launcher até "armado" foi de ≈ 3,5–4 s, com o sistema já aquecido.
@@ -326,6 +339,7 @@ Na primeira instalação do driver, pode haver uma breve desconexão da rede e u
 - Parada e limpeza pelo caminho supervisor → watchdog → rollback, e a guarda de exposição disparando com rotas reais.
   A guarda foi testada só em simulação.
 - Partida no logon com o sistema frio.
+- As 3 tentativas por servidor e a lista de reserva com perfis de outros provedores de VPN.
 - Atualização e reinstalação por cima de uma versão instalada. O aviso de versão nova foi conferido no painel com uma
   versão simulada; a instalação por cima ainda não foi executada.
 
@@ -340,6 +354,9 @@ Na primeira instalação do driver, pode haver uma breve desconexão da rede e u
 - **Janela do gateway vale para o sistema todo:** durante a janela, as rotas /32 do gateway valem para a máquina
   inteira. Outros programas que tentem esses IPs são bloqueados pela guarda WFP; eles falham, não vazam.
 - **IPs do gateway:** o conjunto exposto vem do resolvedor DNS do sistema, e o Discord pode usar outros endereços.
+- **Servidores reserva dependem do provedor:** eles usam a chave do seu perfil, então só ajudam se o provedor aceitar a
+  mesma chave em vários servidores, como a Proton VPN gratuita aceitou. Uma chave que a VPN não aceita mais não é
+  resolvida por eles: gere um perfil novo.
 - **Driver permanece instalado:** depois de *Parar*, o driver NDIS continua instalado, com captura e regras desativadas.
 - **Formato do Discord:** a classificação depende do formato do log do renderer e do IP Discovery de 74 bytes. Se o
   Discord mudar esse formato, o resultado seguro é liberar pela conexão direta, ou seja, sem relay.
