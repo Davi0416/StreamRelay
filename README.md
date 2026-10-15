@@ -4,7 +4,7 @@
 passam por um túnel WireGuard; voz, texto, login, a mídia depois de estabilizada e o resto do computador seguem pela
 conexão direta.
 
-> **Estado: experimental (0.4.8).** Leia [Estado de verificação](#estado-de-verificação) antes de usar.
+> **Estado: experimental (0.5.0).** Leia [Estado de verificação](#estado-de-verificação) antes de usar.
 >
 > Gratuito e não comercial. Este repositório contém apenas esta descrição; o código-fonte não é público. O instalador está em
 > [Releases](../../releases).
@@ -252,6 +252,15 @@ captura. O rollback compara a tabela de rotas com o baseline salvo antes de qual
   se já houver motor ou captura ativos, se houver uma chamada em andamento ou se não houver perfil importado.
 - **Driver de outro programa:** uma instalação do Windows Packet Filter que já existia não é tomada como do produto. Ela
   é reutilizada só se o hash for idêntico, e é preservada na desinstalação.
+- **Rede muda durante o uso:** o motor acompanha o adaptador físico por notificação do Windows (nada é consultado em
+  intervalo fixo). Cabo ou Wi-Fi que caem e voltam na mesma rede não encerram a execução: a captura de pacotes é
+  refeita sozinha. Se a rede mudar de verdade (outro gateway), a execução é desfeita; fora de uma chamada, o
+  StreamRelay liga de novo sozinho, no máximo uma vez a cada 10 minutos; em uma chamada, ele espera ela terminar.
+- **Motor que para sozinho:** nas mesmas condições (fora de uma chamada, limpeza da execução confirmada, sem outro
+  religamento nos últimos 10 minutos), o StreamRelay também liga de novo sozinho se o motor parar de forma
+  inesperada.
+- **Servidor do perfil que não conecta:** os servidores reserva agora também entram quando o handshake com o servidor
+  do perfil nunca fecha, não só quando ele recusa o Discord depois de conectado.
 
 ## O painel
 
@@ -264,8 +273,12 @@ O painel tem três controles:
   do gateway, e por isso **uma chamada em andamento cai**. *Parar* desfaz tudo.
 - **Iniciar com o Windows:** no logon, o painel roda sem janela, executa a mesma sequência e sai.
 
-Estados mostrados: Parado, Iniciando…, Pronto, Em uso, Parando…, Erro (com o que fazer). Fechar a janela do painel não
-para o StreamRelay.
+Estados mostrados: Parado, Iniciando…, Pronto, Em uso, Parando…, Erro (com o que fazer). Se a internet cair enquanto o
+StreamRelay está ativo, o painel mostra **Sem internet** em vez de erro, e volta sozinho quando a rede normalizar. Todo
+aviso de erro tem um botão **Copiar diagnóstico**, que copia os registros da execução (nunca o perfil da VPN nem
+endereços da rede) para colar numa conversa de suporte. A janela não fecha enquanto o StreamRelay está iniciando,
+parando, ou preparando a sessão do Discord; ela avisa o motivo e fecha sozinha ao terminar. Fechar a janela do painel
+nos outros momentos não para o StreamRelay.
 
 Ao abrir, o painel consulta uma vez a versão mais recente publicada em [Releases](../../releases). Se ela for mais nova
 que a instalada, aparece um aviso com o botão **Atualizar**. Nada é baixado nem instalado sem esse clique. Ao clicar, o
@@ -333,6 +346,10 @@ Na primeira instalação do driver, pode haver uma breve desconexão da rede e u
 - Servidores reserva: com um servidor da Proton VPN que não deixava o Discord passar, o motor trocou para um servidor
   reserva com a mesma chave e o Discord criou a sessão pelo túnel (uma execução, 15/10/2026). A mesma chave também foi
   aceita em outros servidores gratuitos da Proton VPN.
+- Recuperação de rede: com uma transmissão de tela ativa, uma queda de 66 s do cabo Ethernet (voltando na mesma rede)
+  foi recuperada sem nenhuma ação manual: a captura de pacotes foi refeita sozinha, a janela do gateway abriu na hora
+  certa para a reconexão que o próprio Discord agendou, e a transmissão voltou a passar pelo relay (uma execução,
+  15/10/2026).
 - Desempenho:
   - com a versão atual, o uso de RAM fica em torno de 20 MB, e o uso de CPU depende do processador;
   - numa medição anterior (12/10/2026), o tempo do launcher até "armado" foi de ≈ 3,5–4 s, com o sistema já aquecido.
@@ -346,8 +363,13 @@ Na primeira instalação do driver, pode haver uma breve desconexão da rede e u
   A guarda foi testada só em simulação.
 - Partida no logon com o sistema frio.
 - As 3 tentativas por servidor e a lista de reserva com perfis de outros provedores de VPN.
+- Servidor reserva quando o handshake com o servidor do perfil nunca fecha (só o caso de recusa depois de conectado
+  foi testado ao vivo).
 - Atualização a partir de uma versão realmente mais antiga instalada. O botão **Atualizar** foi testado com um painel
   marcado como versão anterior: baixou e conferiu o instalador publicado e reinstalou por cima da mesma versão.
+- Religar sozinho depois do motor parar de forma inesperada, ou depois de uma mudança real de rede (gateway
+  diferente); o caminho testado ao vivo foi a mesma rede voltando depois de cair.
+- O aviso **Sem internet** enquanto o StreamRelay está ativo, e o botão **Copiar diagnóstico**.
 
 ## Limitações conhecidas
 
@@ -392,3 +414,10 @@ O StreamRelay é gratuito e não comercial: não é vendido, não tem cobrança 
 pessoa sem custo. O código-fonte não é público.
 
 Software experimental, fornecido sem garantia de qualquer tipo.
+
+O uso é por conta e risco de quem usa. O StreamRelay altera o roteamento de rede do computador e instala um driver de
+captura de pacotes, e plataformas, serviços, jogos e programas de terceiros podem ter termos de uso ou mecanismos de
+proteção que não admitem esse tipo de software. Quem instala é o único responsável por conferir esses termos e por
+qualquer consequência do uso, como suspensão ou banimento de conta, bloqueio, perda de acesso ou de dados. O autor não
+se responsabiliza por punições, danos ou prejuízos de nenhuma natureza decorrentes do uso do programa, nem por
+incompatibilidades com outros softwares.
