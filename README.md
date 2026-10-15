@@ -4,7 +4,7 @@
 passam por um túnel WireGuard; voz, texto, login, a mídia depois de estabilizada e o resto do computador seguem pela
 conexão direta.
 
-> **Estado: experimental (0.4.7).** Leia [Estado de verificação](#estado-de-verificação) antes de usar.
+> **Estado: experimental (0.4.8).** Leia [Estado de verificação](#estado-de-verificação) antes de usar.
 >
 > Gratuito e não comercial. Este repositório contém apenas esta descrição; o código-fonte não é público. O instalador está em
 > [Releases](../../releases).
@@ -86,10 +86,13 @@ importe e clique em **Iniciar** de novo.
 
 ### 6. Atualizar
 
-Quando sair uma versão nova, o painel mostra **Nova versão disponível** com o botão **Baixar**, que abre a página da
-versão em [Releases](../../releases). Baixe o instalador novo e abra. Ele pergunta se deve atualizar e instala por cima,
-mantendo o perfil da VPN, a escolha de iniciar com o Windows e o driver. Se o StreamRelay estiver ativo, o instalador
-pede para pará-lo antes.
+Quando sair uma versão nova, o painel mostra **Nova versão disponível** com o botão **Atualizar**. Clique, aceite a
+permissão do Windows e aguarde: o painel baixa o instalador, fecha, a atualização roda e o painel novo abre sozinho no
+fim. O perfil da VPN, a escolha de iniciar com o Windows e o driver são mantidos. Se o StreamRelay estiver ativo, o
+instalador pede para pará-lo antes.
+
+Na versão 0.4.7 ou anterior, o botão se chama **Baixar** e abre a página da versão em [Releases](../../releases):
+baixe o instalador novo e abra. Ele pergunta se deve atualizar e instala por cima, mantendo as mesmas configurações.
 
 ## Motivação
 
@@ -265,8 +268,11 @@ Estados mostrados: Parado, Iniciando…, Pronto, Em uso, Parando…, Erro (com o
 para o StreamRelay.
 
 Ao abrir, o painel consulta uma vez a versão mais recente publicada em [Releases](../../releases). Se ela for mais nova
-que a instalada, aparece um aviso com o botão **Baixar**, que só abre a página da versão. Nada é baixado nem instalado
-sozinho, e sem internet o aviso simplesmente não aparece.
+que a instalada, aparece um aviso com o botão **Atualizar**. Nada é baixado nem instalado sem esse clique. Ao clicar, o
+painel baixa o instalador anexado a essa versão, confere se o arquivo bate com o SHA-256 que o GitHub publica para ele e
+só então abre o instalador, já no modo de atualização. Se o download falhar, o arquivo não bater ou a permissão do
+Windows for recusada, o painel continua aberto e avisa que não foi possível atualizar. Sem internet, o aviso não
+aparece.
 
 ## Requisitos
 
@@ -340,8 +346,8 @@ Na primeira instalação do driver, pode haver uma breve desconexão da rede e u
   A guarda foi testada só em simulação.
 - Partida no logon com o sistema frio.
 - As 3 tentativas por servidor e a lista de reserva com perfis de outros provedores de VPN.
-- Atualização e reinstalação por cima de uma versão instalada. O aviso de versão nova foi conferido no painel com uma
-  versão simulada; a instalação por cima ainda não foi executada.
+- Atualização a partir de uma versão realmente mais antiga instalada. O botão **Atualizar** foi testado com um painel
+  marcado como versão anterior: baixou e conferiu o instalador publicado e reinstalou por cima da mesma versão.
 
 ## Limitações conhecidas
 
