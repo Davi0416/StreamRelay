@@ -1,10 +1,10 @@
 # StreamRelay
 
-*Split tunneling* por fluxo para o Discord no Windows. Só a criação da sessão e o início de uma transmissão de tela
-passam por um túnel WireGuard; voz, texto, login, a mídia depois de estabilizada e o resto do computador seguem pela
-conexão direta.
+*Split tunneling* por fluxo para o Discord no Windows (e para o Vesktop, em modo experimental). Só a criação da sessão
+e o início de uma transmissão de tela passam por um túnel WireGuard; voz, texto, login, a mídia depois de estabilizada
+e o resto do computador seguem pela conexão direta.
 
-> **Estado: experimental (0.5.0).** Leia [Estado de verificação](#estado-de-verificação) antes de usar.
+> **Estado: experimental (0.5.1).** Leia [Estado de verificação](#estado-de-verificação) antes de usar.
 >
 > Gratuito e não comercial. Este repositório contém apenas esta descrição; o código-fonte não é público. O instalador está em
 > [Releases](../../releases).
@@ -27,8 +27,8 @@ conexão direta.
 ## Como usar
 
 > [!IMPORTANT]
-> - Use o Discord baixado do site oficial, com a sua conta já conectada. A versão da Microsoft Store, o PTB e o
->   Canary não são reconhecidos.
+> - Use o Discord baixado do site oficial (com ou sem Vencord) ou o Vesktop (experimental), com a sua conta já
+>   conectada. A versão da Microsoft Store, o PTB e o Canary não são reconhecidos.
 > - Desconecte qualquer outra VPN antes de usar. O StreamRelay não funciona com outro cliente de VPN ativo ao mesmo
 >   tempo.
 > - O arquivo `.conf` contém a chave privada da sua VPN. Não use o `.conf` de outra pessoa e não envie o seu para
@@ -46,11 +46,11 @@ Na primeira instalação, a rede pode cair por alguns segundos e o Windows pode 
 
 ### 2. Impedir o Discord de abrir sozinho com o Windows
 
-O StreamRelay precisa estar pronto **antes** de o Discord abrir, e por isso ele mesmo abre o Discord.
+O StreamRelay precisa estar pronto **antes** de o Discord abrir, e por isso ele mesmo abre o Discord (ou o Vesktop).
 
 1. Aperte **Ctrl + Shift + Esc** para abrir o Gerenciador de Tarefas.
 2. Vá na aba **Aplicativos de inicialização**.
-3. Clique em **Discord** > **Desabilitar**.
+3. Clique em **Discord** > **Desabilitar**. Se usa o Vesktop, faça o mesmo com ele.
 
 ### 3. Obter um perfil WireGuard (`.conf`)
 
@@ -74,11 +74,12 @@ Funciona com qualquer VPN que forneça um perfil WireGuard com um `[Interface]` 
 
 1. Abra o painel do StreamRelay.
 2. Arraste o `.conf` para **Perfil da VPN**, ou clique para selecionar o arquivo.
-3. Fora de uma chamada, clique em **Iniciar**. O Discord fecha e abre sozinho; uma chamada em andamento cai.
+3. Abra o cliente que vai usar (Discord ou Vesktop). Fora de uma chamada, clique em **Iniciar**. O cliente fecha e abre
+   sozinho; uma chamada em andamento cai. Se os dois estiverem abertos, o painel pede para fechar um deles.
 
 ### 5. Pronto
 
-Quando o painel mostrar **Pronto**, use o Discord e compartilhe a tela normalmente. Fechar a janela do painel não para o
+Quando o painel mostrar **Pronto**, use o Discord (ou o Vesktop) e compartilhe a tela normalmente. Fechar a janela do painel não para o
 StreamRelay; para desligar, clique em **Parar**.
 
 Se o painel avisar **O servidor da VPN não deixa o Discord passar**, gere na sua VPN um perfil de outro servidor,
@@ -173,7 +174,8 @@ sem o encapsulamento do WireGuard e sem o MTU reduzido do túnel (1420).
 ### 1. Identidade do alvo
 
 O motor só atua sobre o `Discord.exe` instalado em `%LOCALAPPDATA%\Discord\app-<versão>\`, conferido por PID, horário
-de criação do processo e caminho da imagem. Um PID reaproveitado por outro processo é recusado.
+de criação do processo e caminho da imagem. Um PID reaproveitado por outro processo é recusado. No modo Vesktop, o alvo
+é o caminho exato do `vesktop.exe` escolhido no painel (instalado ou portátil), com a mesma conferência.
 
 ### 2. Túnel
 
@@ -235,7 +237,23 @@ O endpoint volta para a conexão direta quando a mídia está de fato fluindo:
 Na migração, o AllowedIP e as rotas são removidos primeiro, depois o filtro do endpoint é desativado e o socket de
 relay é fechado.
 
-### 6. Encerramento
+### 6. Vesktop (experimental)
+
+O Vesktop carrega o cliente web do Discord: não tem o módulo de voz nativo, e a mídia usa WebRTC. Por isso ele tem uma
+integração própria, usada só quando o Vesktop é o cliente escolhido.
+
+- **Log:** ao abrir o Vesktop, o painel liga o log padrão do Chromium. O motor lê dele só os marcadores de conexão. O
+  arquivo fica só no computador, é zerado a cada **Iniciar** e não entra no diagnóstico copiado.
+- **Gateway:** mesma janela, com os mesmos prazos da seção 3.
+- **Transmissão:** quando o log mostra que uma conexão de transmissão está começando (`RTCControlSocket(stream)`), o
+  motor liga a captura de pacotes só para o processo de rede do Vesktop. O primeiro socket UDP criado depois disso cujo
+  primeiro pacote é uma verificação de conectividade ICE (STUN *Binding Request*) passa pelo túnel, com o mesmo relay e
+  os mesmos critérios de volta à conexão direta da seção 5. A captura é desligada quando essa conexão volta à rota
+  direta, ou 15 s depois se nenhuma conexão de transmissão aparecer. A voz da chamada segue direta desde o início.
+- **Túnel ocioso:** entre uma preparação e outra, o adaptador do túnel fica desligado, e o Vesktop só tem permissão de
+  usar o túnel durante a janela do gateway.
+
+### 7. Encerramento
 
 Ao parar, o motor devolve os relays à conexão direta, remove regras, rotas e AllowedIPs, fecha o adaptador e desativa a
 captura. O rollback compara a tabela de rotas com o baseline salvo antes de qualquer mudança.
@@ -243,7 +261,8 @@ captura. O rollback compara a tabela de rotas com o baseline salvo antes de qual
 ## Proteções e recuperação de falhas
 
 - **Guarda WFP do túnel:** filtros WFP em modo usuário, numa sessão dinâmica, bloqueiam todo connect/accept (IPv4 e
-  IPv6) na interface do túnel, exceto do próprio motor e da imagem auditada do Discord. Ela é aberta antes de qualquer
+  IPv6) na interface do túnel, exceto do próprio motor e da imagem auditada do Discord (no modo Vesktop, a imagem do
+  Vesktop, e só durante a janela do gateway). Ela é aberta antes de qualquer
   exposição e falha fechada: outro programa que tente um destino exposto **falha**, em vez de passar pela VPN.
 - **Guarda de exposição:** o supervisor lê a tabela de rotas do sistema a cada 1 s. Qualquer /32 do túnel presente por
   ≥ 60 s encerra o motor e dispara o rollback.
@@ -269,8 +288,9 @@ O painel tem três controles:
 - **Perfil da VPN:** arraste ou selecione um arquivo WireGuard `.conf`. Cada pessoa usa o perfil da própria VPN. O
   perfil fica só neste computador, numa pasta acessível apenas ao usuário, ao SYSTEM e aos administradores. Perfis
   recusados mostram a causa (seções, chave, endereço, endpoint, sintaxe).
-- **Iniciar / Parar:** *Iniciar* fecha o Discord, arma o motor e reabre o Discord. Essa ordem é necessária para a janela
-  do gateway, e por isso **uma chamada em andamento cai**. *Parar* desfaz tudo.
+- **Iniciar / Parar:** *Iniciar* fecha o cliente escolhido (Discord ou Vesktop), arma o motor e reabre o cliente. Essa
+  ordem é necessária para a janela do gateway, e por isso **uma chamada em andamento cai**. O painel usa o cliente que
+  estiver aberto; se nenhum estiver, usa a última escolha. *Parar* desfaz tudo.
 - **Iniciar com o Windows:** no logon, o painel roda sem janela, executa a mesma sequência e sai.
 
 Estados mostrados: Parado, Iniciando…, Pronto, Em uso, Parando…, Erro (com o que fazer). Se a internet cair enquanto o
@@ -290,7 +310,8 @@ aparece.
 ## Requisitos
 
 - Windows x64.
-- Discord para desktop instalado no local padrão do usuário.
+- Discord para desktop instalado no local padrão do usuário, ou Vesktop (experimental), instalado ou portátil. Na
+  primeira vez, abra o Vesktop portátil antes de clicar em **Iniciar**, para ele ser encontrado.
 - Adaptador físico Ethernet ou Wi-Fi com **um** endereço IPv4.
 - Um perfil WireGuard próprio, de qualquer provedor ou servidor compatível.
 - Permissão de administrador na instalação (um único UAC).
@@ -325,7 +346,7 @@ Na primeira instalação do driver, pode haver uma breve desconexão da rede e u
 
 **Verificado:**
 
-- Testes automatizados: 8 testes C++ de lógica pura, testes PowerShell do instalador e do launcher (parte deles em
+- Testes automatizados: 10 testes C++ de lógica pura, testes PowerShell do instalador e do launcher (parte deles em
   subconjunto, sem os trechos que exigem sistema vivo) e `cargo test` do
   painel. Todos PASS na base atual.
 - Guarda WFP: 8/8 casos PASS num teste elevado com a mesma classe de filtro aplicada ao loopback. Inclui a remoção dos
@@ -350,8 +371,13 @@ Na primeira instalação do driver, pode haver uma breve desconexão da rede e u
   foi recuperada sem nenhuma ação manual: a captura de pacotes foi refeita sozinha, a janela do gateway abriu na hora
   certa para a reconexão que o próprio Discord agendou, e a transmissão voltou a passar pelo relay (uma execução,
   15/10/2026).
+- Vesktop (experimental), com a versão 0.5.1: a sessão do gateway foi criada pelo túnel, e a transmissão de tela
+  funcionou assistindo e transmitindo, uma execução cada (15/10/2026). O resultado é relato do autor, apoiado pelos
+  contadores do motor: a conexão voltou à rota direta em 3,3 s assistindo e em 5,7 s transmitindo, com 0 falhas.
 - Desempenho:
   - com a versão atual, o uso de RAM fica em torno de 20 MB, e o uso de CPU depende do processador;
+  - na versão 0.5.1, o motor deixou de coletar contadores de CPU de todos os processos para encontrar o Discord (no
+    Windows 11), e o painel parou de redesenhar o indicador continuamente com a conexão estável;
   - numa medição anterior (12/10/2026), o tempo do launcher até "armado" foi de ≈ 3,5–4 s, com o sistema já aquecido.
 
 **NÃO verificado:**
@@ -370,13 +396,19 @@ Na primeira instalação do driver, pode haver uma breve desconexão da rede e u
 - Religar sozinho depois do motor parar de forma inesperada, ou depois de uma mudança real de rede (gateway
   diferente); o caminho testado ao vivo foi a mesma rede voltando depois de cair.
 - O aviso **Sem internet** enquanto o StreamRelay está ativo, e o botão **Copiar diagnóstico**.
+- Discord e Vencord ao vivo com a versão 0.5.1. O caminho do Discord não mudou nesta versão e passou nos testes
+  automáticos.
+- Vesktop: repetição, Vesktop portátil, várias transmissões ao mesmo tempo e sessões longas.
 
 ## Limitações conhecidas
 
 - **Só IPv4.**
 - **Não funciona junto com outra VPN:** outro cliente de VPN ativo ao mesmo tempo impede o uso. Desconecte as outras
   VPNs antes de clicar em *Iniciar*.
-- **Iniciar derruba uma chamada em andamento**, porque o Discord é fechado e reaberto.
+- **Iniciar derruba uma chamada em andamento**, porque o cliente (Discord ou Vesktop) é fechado e reaberto.
+- **Vesktop é experimental:** depende do formato do log do cliente web e do primeiro pacote ICE da transmissão. Se isso
+  mudar, a transmissão segue pela conexão direta, sem relay. O Vesktop é fechado à força ao clicar em **Iniciar**; se
+  as ferramentas de desenvolvedor dele estiverem abertas nesse momento, o Discord pode pedir login de novo.
 - **Uma conta por instalação:** as tarefas ficam ligadas à conta que instalou.
 - **Instalador sem assinatura de código:** o SmartScreen vai avisar.
 - **Janela do gateway vale para o sistema todo:** durante a janela, as rotas /32 do gateway valem para a máquina
