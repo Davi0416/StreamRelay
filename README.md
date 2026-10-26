@@ -4,7 +4,7 @@
 e o início de uma transmissão de tela passam por um túnel WireGuard; voz, texto, login, a mídia depois de estabilizada
 e o resto do computador seguem pela conexão direta.
 
-> **Estado: experimental (0.5.1).** Leia [Estado de verificação](#estado-de-verificação) antes de usar.
+> **Estado: experimental (0.5.6).** Leia [Estado de verificação](#estado-de-verificação) antes de usar.
 >
 > Gratuito e não comercial. Este repositório contém apenas esta descrição; o código-fonte não é público. O instalador está em
 > [Releases](../../releases).
@@ -29,8 +29,8 @@ e o resto do computador seguem pela conexão direta.
 > [!IMPORTANT]
 > - Use o Discord baixado do site oficial (com ou sem Vencord) ou o Vesktop (experimental), com a sua conta já
 >   conectada. A versão da Microsoft Store, o PTB e o Canary não são reconhecidos.
-> - Desconecte qualquer outra VPN antes de usar. O StreamRelay não funciona com outro cliente de VPN ativo ao mesmo
->   tempo.
+> - Desconecte qualquer outra VPN antes de usar. Com outro cliente de VPN ativo ao mesmo tempo, o StreamRelay tenta se
+>   ajustar a ele, mas a transmissão pode não funcionar.
 > - O arquivo `.conf` contém a chave privada da sua VPN. Não use o `.conf` de outra pessoa e não envie o seu para
 >   ninguém.
 
@@ -83,7 +83,8 @@ Quando o painel mostrar **Pronto**, use o Discord (ou o Vesktop) e compartilhe a
 StreamRelay; para desligar, clique em **Parar**.
 
 Se o painel avisar **O servidor da VPN não deixa o Discord passar**, gere na sua VPN um perfil de outro servidor,
-importe e clique em **Iniciar** de novo.
+importe e clique em **Iniciar** de novo. Se o aviso for **Outra VPN ligada neste computador está bloqueando a VPN do
+StreamRelay**, trocar de servidor não resolve: desligue a outra VPN, clique em **Parar** e depois em **Iniciar**.
 
 ### 6. Atualizar
 
@@ -131,8 +132,8 @@ sem o encapsulamento do WireGuard e sem o MTU reduzido do túnel (1420).
   processo inteiro.
 - **Túnel ocioso por padrão:** o peer WireGuard começa com AllowedIPs vazio e sem rotas. Um destino só fica alcançável
   pelo túnel enquanto está explicitamente exposto.
-- **Exposição com prazo:** a janela do gateway dura no máximo 20 s. O relay de mídia dura até a mídia estabilizar, ou
-  no máximo 30 s.
+- **Exposição com prazo:** a janela do gateway dura no máximo 20 s, ou no máximo 2 min quando o Discord ainda está
+  carregando o aplicativo. O relay de mídia dura até a mídia estabilizar, ou no máximo 30 s.
 - **Na dúvida, rota direta:** classificação ambígua, candidato antigo, prazo vencido ou formato desconhecido sempre
   resultam em rota direta, nunca em túnel.
 - **Isolamento fail-closed:** filtros WFP na interface do túnel bloqueiam qualquer outro programa. Se outro processo
@@ -200,8 +201,12 @@ Quando aparece um processo principal **novo** do Discord, ou quando o log indica
 | --- | --- |
 | Fecha depois do `READY` da sessão | 2 s |
 | Prazo total da janela | 20 s |
+| Discord que ainda não começou a conectar (aplicativo carregando, por exemplo logo depois de uma versão nova do Discord) | a janela espera até 2 min; quando o Discord começa a conectar, ele tem o tempo normal |
 | Tentativa sem conexão estabelecida | 8 s, depois **uma** nova tentativa |
-| Depois de falhar | o Discord segue pela conexão direta e o painel avisa |
+| Depois de falhar | o painel fecha e abre o Discord mais uma vez sozinho; se falhar de novo, o Discord segue pela conexão direta e o painel avisa |
+
+A espera pelo aplicativo e a reabertura automática valem só para o Discord. No Vesktop, o prazo continua 20 s e, se a
+janela falhar, ele segue pela conexão direta com o aviso no painel.
 
 Ao fechar a janela, as conexões TCP 443 do Discord que ficaram no túnel são encerradas (`SetTcpEntry`, `DELETE_TCB`),
 e o Discord reconecta pela conexão direta retomando a mesma sessão.
@@ -278,8 +283,21 @@ captura. O rollback compara a tabela de rotas com o baseline salvo antes de qual
 - **Motor que para sozinho:** nas mesmas condições (fora de uma chamada, limpeza da execução confirmada, sem outro
   religamento nos últimos 10 minutos), o StreamRelay também liga de novo sozinho se o motor parar de forma
   inesperada.
-- **Servidor do perfil que não conecta:** os servidores reserva agora também entram quando o handshake com o servidor
-  do perfil nunca fecha, não só quando ele recusa o Discord depois de conectado.
+- **Servidor do perfil que não conecta:** os servidores reserva também entram quando o handshake com o servidor do
+  perfil nunca fecha, não só quando ele recusa o Discord depois de conectado.
+- **Internet ao iniciar:** ao ligar, o StreamRelay espera até 3 min por uma conexão de rede física (cabo ou Wi-Fi) com
+  endereço e rota para a internet. Ele confere todas as conexões do computador: uma conexão que já caiu e deixou rota
+  para trás, ou o adaptador virtual de outro programa, não conta. Enquanto espera, o painel mostra **Sem internet**.
+- **Outra VPN levando a internet:** quando outra VPN (por exemplo, Cloudflare WARP) está levando a internet do
+  computador, o túnel do StreamRelay passa por dentro dela, com um MTU menor para caber, e a captura e a rota direta do
+  Discord passam pela interface dessa VPN. Outra VPN ligando ou desligando durante o uso não é tratada como erro de
+  limpeza. Se ela bloquear o túnel, o painel diz isso, em vez de culpar o servidor do perfil.
+- **Computador desligado ou travado com o StreamRelay ativo:** no próximo **Iniciar**, o que sobrou da execução
+  interrompida é limpo antes de começar.
+- **Discord que se atualiza durante o início:** se o Discord trocar de versão enquanto o StreamRelay está ligando, o
+  Discord é escolhido de novo e o início é tentado mais uma vez.
+- **Dois pedidos de início ao mesmo tempo** (por exemplo, o início com o Windows e um clique em **Iniciar** nos mesmos
+  segundos): o segundo espera o primeiro terminar e, se o StreamRelay já estiver ativo, não faz mais nada.
 
 ## O painel
 
@@ -294,11 +312,15 @@ O painel tem três controles:
 - **Iniciar com o Windows:** no logon, o painel roda sem janela, executa a mesma sequência e sai.
 
 Estados mostrados: Parado, Iniciando…, Pronto, Em uso, Parando…, Erro (com o que fazer). Se a internet cair enquanto o
-StreamRelay está ativo, o painel mostra **Sem internet** em vez de erro, e volta sozinho quando a rede normalizar. Todo
+StreamRelay está ativo, ou se ainda não houver internet quando ele liga, o painel mostra **Sem internet** em vez de erro,
+e segue sozinho quando a rede normalizar. Todo
 aviso de erro tem um botão **Copiar diagnóstico**, que copia os registros da execução (nunca o perfil da VPN nem
 endereços da rede) para colar numa conversa de suporte. A janela não fecha enquanto o StreamRelay está iniciando,
 parando, ou preparando a sessão do Discord; ela avisa o motivo e fecha sozinha ao terminar. Fechar a janela do painel
 nos outros momentos não para o StreamRelay.
+
+Se o painel encontrar um erro ao abrir, ele mostra uma mensagem dizendo o que aconteceu, em vez de fechar sem aviso. Se
+um painel anterior ficou aberto sem janela, abrir de novo avisa e diz o que fazer.
 
 Ao abrir, o painel consulta uma vez a versão mais recente publicada em [Releases](../../releases). Se ela for mais nova
 que a instalada, aparece um aviso com o botão **Atualizar**. Nada é baixado nem instalado sem esse clique. Ao clicar, o
@@ -324,6 +346,7 @@ aparece.
 - registra as duas tarefas agendadas (iniciar e parar, sem gatilho próprio);
 - cria **uma** regra de firewall de entrada, só para o executável do motor e só no perfil Privado;
 - instala o driver NDIS a partir do pacote original assinado (INF/CAT), ou reutiliza uma instalação idêntica;
+- remove o registro de um componente de rede de versões antigas do StreamRelay que ficou para trás sem o arquivo;
 - pergunta se deve iniciar com o Windows.
 
 Na primeira instalação do driver, pode haver uma breve desconexão da rede e um pedido de reinício.
@@ -374,6 +397,12 @@ Na primeira instalação do driver, pode haver uma breve desconexão da rede e u
 - Vesktop (experimental), com a versão 0.5.1: a sessão do gateway foi criada pelo túnel, e a transmissão de tela
   funcionou assistindo e transmitindo, uma execução cada (15/10/2026). O resultado é relato do autor, apoiado pelos
   contadores do motor: a conexão voltou à rota direta em 3,3 s assistindo e em 5,7 s transmitindo, com 0 falhas.
+- Discord com o motor atual (o mesmo da 0.5.5 e da 0.5.6), uma execução (26/10/2026): pelos contadores do motor, a
+  sessão do gateway foi criada pelo túnel e fechou em `READY`, e uma transmissão assistida passou pelo relay e voltou à
+  rota direta em 2,8 s, com 0 falhas. O resultado visual não foi registrado.
+- Início com uma conexão caída que deixou rota para trás (Wi-Fi desconectado, cabo funcionando), uma execução
+  (26/10/2026): a 0.5.5 ficou os 3 min em **Sem internet**; com a correção da 0.5.6, o motor armou cerca de 1 s depois
+  do pedido de início.
 - Desempenho:
   - com a versão atual, o uso de RAM fica em torno de 20 MB, e o uso de CPU depende do processador;
   - na versão 0.5.1, o motor deixou de coletar contadores de CPU de todos os processos para encontrar o Discord (no
@@ -396,15 +425,22 @@ Na primeira instalação do driver, pode haver uma breve desconexão da rede e u
 - Religar sozinho depois do motor parar de forma inesperada, ou depois de uma mudança real de rede (gateway
   diferente); o caminho testado ao vivo foi a mesma rede voltando depois de cair.
 - O aviso **Sem internet** enquanto o StreamRelay está ativo, e o botão **Copiar diagnóstico**.
-- Discord e Vencord ao vivo com a versão 0.5.1. O caminho do Discord não mudou nesta versão e passou nos testes
-  automáticos.
+- Vencord ao vivo desde a versão 0.5.1.
 - Vesktop: repetição, Vesktop portátil, várias transmissões ao mesmo tempo e sessões longas.
+- A espera pelo aplicativo do Discord depois de uma versão nova e a reabertura automática do Discord (testadas só em
+  testes automáticos).
+- Outra VPN levando a internet: a transmissão de tela com ela ligada.
+- A limpeza de uma execução interrompida no próximo **Iniciar**, os dois pedidos de início ao mesmo tempo e a remoção
+  do registro de componente de rede antigo na instalação (testados só em testes automáticos).
 
 ## Limitações conhecidas
 
 - **Só IPv4.**
-- **Não funciona junto com outra VPN:** outro cliente de VPN ativo ao mesmo tempo impede o uso. Desconecte as outras
-  VPNs antes de clicar em *Iniciar*.
+- **Outra VPN ao mesmo tempo:** o StreamRelay se ajusta a outra VPN que leva a internet, mas ela pode bloquear o túnel,
+  e a transmissão pode não funcionar. Desconecte as outras VPNs antes de clicar em *Iniciar*.
+- **Rede conectada sem internet ao ligar:** a espera pela internet confere se a conexão física tem endereço e rota, não
+  se a internet responde. Com o cabo ou o Wi-Fi conectado, mas sem acesso à internet, o túnel não conecta e o início
+  falha (visto numa execução, 26/10/2026). Clique em **Iniciar** quando a internet voltar.
 - **Iniciar derruba uma chamada em andamento**, porque o cliente (Discord ou Vesktop) é fechado e reaberto.
 - **Vesktop é experimental:** depende do formato do log do cliente web e do primeiro pacote ICE da transmissão. Se isso
   mudar, a transmissão segue pela conexão direta, sem relay. O Vesktop é fechado à força ao clicar em **Iniciar**; se
